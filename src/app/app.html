@@ -1,0 +1,16 @@
+<div class="app-frame" [class.authenticated-shell]="user()">
+  @if (user()) {
+    <aside class="sidebar">
+      <a class="brand" routerLink="/dashboard"><span class="brand-mark">Q</span><span>DocQ<span class="brand-dot">.</span></span></a>
+      <div class="workspace-switcher"><span class="eyebrow">ACTIVE WORKSPACE</span>@if (active().id) {<a class="workspace-current" [routerLink]="['/workspaces', active().id]"><span class="workspace-icon">{{active().name.charAt(0)}}</span><span>{{active().name}}</span><span class="chevron">v</span></a>} @else {<a class="workspace-current" routerLink="/workspaces"><span class="workspace-icon">+</span><span>Create workspace</span></a>}</div>
+      <nav class="main-nav"><span class="nav-label">Workspace</span><a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}"><span>O</span> Overview</a><a routerLink="/workspaces" routerLinkActive="active"><span>W</span> Workspaces</a><a [routerLink]="active().id ? ['/workspaces', active().id, 'documents'] : ['/workspaces']" routerLinkActive="active"><span>D</span> Documents</a><button class="nav-link" (click)="openChat()"><span>✦</span> AI Chat <b class="nav-badge">AI</b></button></nav>
+      <div class="sidebar-footer"><div class="user-card-wrap"><div class="user-card"><span class="avatar">{{user()?.name?.charAt(0)}}</span><div><strong>{{user()?.name}}</strong><small>{{user()?.email}}</small></div></div><button class="sidebar-logout" (click)="openLogoutConfirmation()">Logout</button></div></div>
+    </aside>
+  }
+  <main class="main-content" [class.public-content]="!user()">
+    @if (user()) {<header class="topbar"><div class="breadcrumbs"><span>Workspace</span><b>/</b><strong>{{active().name || 'None selected'}}</strong></div><div class="topbar-actions"><span class="top-avatar">{{user()?.name?.charAt(0)}}</span></div></header>}
+    <router-outlet />
+    @if (toast) {<div class="app-toast" role="status">{{toast}}</div>}
+    @if (confirmLogout) {<div class="confirm-backdrop"><section class="confirm-dialog"><h3>Logout</h3><p>Are you sure you want to logout?</p><div class="confirm-actions"><button class="secondary" (click)="cancelLogout()">Cancel</button><button class="primary" (click)="logout()">Logout</button></div></section></div>}
+  </main>
+</div>

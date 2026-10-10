@@ -1,0 +1,2 @@
+import { Injectable, Logger } from '@nestjs/common'; import { DocumentProcessorService } from './document-processor.service';
+@Injectable() export class QueueService { private readonly logger = new Logger(QueueService.name); constructor(private readonly processor: DocumentProcessorService) {} async enqueueDocumentProcessing(documentId: string) { this.logger.log(`Queued document ${documentId}`); setImmediate(async () => { try { await this.processor.process(documentId); } catch (error) { this.logger.error(`Unable to process ${documentId}`, error); } }); } }

@@ -1,0 +1,18 @@
+import { BadRequestException, Injectable, NotFoundException, StreamableFile } from '@nestjs/common';
+import { createReadStream } from 'fs';
+import { PrismaService } from '../prisma/prisma.service';
+import { WorkspaceAccessService } from '../common/workspace-access.service';
+import { StorageService } from '../storage/storage.service';
+import { QueueService } from '../processing/queue.service'; import { UploadedPdf } from './uploaded-file';
+@Injectable()
+export class DocumentsService {
+  constructor(private readonly prisma: PrismaService, private readonly access: WorkspaceAccessService, private readonly storage: StorageService, private readonly queue: QueueService) {}
+  async list(userId: string, workspaceId: string) { await this.access.requireMember(workspaceId, userId); const documents = await this.prisma.document.findMany({ where: { workspaceId }, include: { uploadedBy: { select: { name: true } } }, orderBy: { createdAt: 'desc' } }); return documents.map((document) => this.toResponse(document)); }
+  async upload(userId: string, workspaceId: string, file?: UploadedPdf) { await this.access.requireMember(workspaceId, userId); if (!file || file.mimetype !== 'application/pdf') throw new BadRequestException('Only PDF files are supported'); if (file.size > 25 * 1024 * 1024) throw new BadRequestException('Maximum file size is 25MB'); const storageKey = await this.storage.save(file); const document = await this.prisma.document.create({ data: { workspaceId, uploadedById: userId, name: file.originalname, storageKey, mimeType: file.mimetype, sizeBytes: BigInt(file.size) }, include: { uploadedBy: { select: { name: true } } } }); await this.queue.enqueueDocumentProcessing(document.id); return this.toResponse(document); }
+  async get(userId: string, workspaceId: string, documentId: string) { await this.access.requireMember(workspaceId, userId); const document = await this.prisma.document.findFirstOrThrow({ where: { id: documentId, workspaceId }, include: { uploadedBy: { select: { name: true } } } }); return this.toResponse(document); }
+  async file(userId: string, workspaceId: string, documentId: string) { await this.access.requireMember(workspaceId, userId); const document = await this.prisma.document.findFirst({ where: { id: documentId, workspaceId } }); if (!document) throw new NotFoundException('Document not found'); return new StreamableFile(createReadStream(this.storage.path(document.storageKey)), { type: document.mimeType, disposition: `inline; filename="${document.name}"` }); }
+  async remove(userId: string, workspaceId: string, documentId: string) { await this.access.requireMember(workspaceId, userId, 'OWNER'); await this.prisma.document.delete({ where: { id: documentId, workspaceId } }); return { success: true }; }
+  async retry(userId: string, workspaceId: string, documentId: string) { const document = await this.get(userId, workspaceId, documentId); const updated = await this.prisma.document.update({ where: { id: document.id }, data: { status: 'UPLOADED', failureReason: null }, include: { uploadedBy: { select: { name: true } } } }); await this.queue.enqueueDocumentProcessing(updated.id); return this.toResponse(updated); }
+  private toResponse(document: any) { return { ...document, sizeBytes: document.sizeBytes.toString(), size: this.formatBytes(Number(document.sizeBytes)), pages: document.pageCount ?? 0, uploadedBy: document.uploadedBy?.name ?? document.uploadedById, uploadedAt: document.createdAt, color: '#6658e8' }; }
+  private formatBytes(bytes: number) { if (!bytes) return '0 B'; const units = ['B', 'KB', 'MB', 'GB']; const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1); return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`; }
+}

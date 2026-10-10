@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: docq-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: docq
+      POSTGRES_PASSWORD: docq_password
+      POSTGRES_DB: docq
+    ports:
+      - "55432:5432"
+    volumes:
+      - docq-postgres-data:/var/lib/postgresql/data
+volumes:
+  docq-postgres-data:

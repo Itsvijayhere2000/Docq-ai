@@ -1,0 +1,10 @@
+import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common'; import { Request, Response } from 'express'; import { AuthService } from './auth.service'; import { LoginDto, RegisterDto, SignupOtpRequestDto, SignupOtpVerifyDto } from './dto/auth.dto'; import { JwtAuthGuard } from '../common/jwt-auth.guard';
+@Controller('auth') export class AuthController { constructor(private readonly auth: AuthService) {} private cookie(res: Response, token: string) { res.cookie('refreshToken', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 7 * 86400000 }); }
+  @Post('register') async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) { const result = await this.auth.register(dto); this.cookie(res, result.refreshToken); return { accessToken: result.accessToken }; }
+  @Post('signup/request-otp') requestOtp(@Body() dto: SignupOtpRequestDto) { return this.auth.requestSignupOtp(dto); }
+  @Post('signup/verify-otp') async verifyOtp(@Body() dto: SignupOtpVerifyDto, @Res({ passthrough: true }) res: Response) { const result = await this.auth.verifySignupOtp(dto); this.cookie(res, result.refreshToken); return { accessToken: result.accessToken }; }
+  @Post('login') async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) { const result = await this.auth.login(dto); this.cookie(res, result.refreshToken); return { accessToken: result.accessToken }; }
+  @Post('refresh') async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) { const token = req.cookies?.refreshToken as string | undefined; if (!token) return { accessToken: null }; const result = await this.auth.refresh(token); this.cookie(res, result.refreshToken); return { accessToken: result.accessToken }; }
+  @Get('me') @UseGuards(JwtAuthGuard) me(@Req() req: Request & { user: { sub: string } }) { return this.auth.me(req.user.sub); }
+  @Post('logout') logout(@Res({ passthrough: true }) res: Response) { res.clearCookie('refreshToken'); return { success: true }; }
+}

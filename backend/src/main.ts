@@ -1,0 +1,3 @@
+import { ValidationPipe } from '@nestjs/common'; import { NestFactory } from '@nestjs/core'; import cookieParser = require('cookie-parser'); import * as helmetPackage from 'helmet'; import { AppModule } from './app.module'; const helmet = (helmetPackage as any).default ?? helmetPackage;
+async function bootstrap() { const app = await NestFactory.create(AppModule); app.setGlobalPrefix('api'); app.use(helmet()); app.use(cookieParser()); app.enableCors({ origin: process.env.FRONTEND_ORIGIN || 'http://localhost:4200', credentials: true }); app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true })); await app.listen(Number(process.env.PORT || 3000)); }
+bootstrap();
